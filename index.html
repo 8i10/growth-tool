@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>成長判定の儀 — CoC 自動成長ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15141b;--bg-grad:#191822;--panel:#1e1d28;--panel-2:#25232f;
+    --line:#34313f;--line-soft:#2a2834;--ink:#e9e3d4;--muted:#9b94a8;--muted-2:#6f6a7c;
+    --gold:#c6a052;--gold-dim:#8a7335;
+    --crit:#d8b94f;--special:#74b6c6;--success:#7fb98c;--fail:#8e8898;--fumble:#c66247;--shoki:#9fcf7f;
+    --mono:'DejaVu Sans Mono',ui-monospace,Menlo,Consolas,monospace;
+    --serif:'Shippori Mincho','Yu Mincho',serif;
+    --sans:'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic',Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 50% -10%, #221f2e 0%, transparent 60%),linear-gradient(180deg,var(--bg-grad),var(--bg));color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.7;min-height:100vh;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:48px 22px 96px}
+  header.masthead{text-align:center;padding:18px 0 30px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);opacity:.85;margin-bottom:14px;padding-left:.5em}
+  h1.title{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5.4vw,46px);letter-spacing:.06em;margin:0;line-height:1.25;background:linear-gradient(180deg,#f2ecdc,#cdbf9a);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .title-rule{width:min(420px,80%);height:1px;margin:20px auto 14px;background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);position:relative}
+  .title-rule::after{content:"✦";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--gold);font-size:13px;background:var(--bg);padding:0 12px}
+  .sub{color:var(--muted);font-size:13.5px;max-width:660px;margin:0 auto}
+  .step{background:linear-gradient(180deg,var(--panel),#1b1a24);border:1px solid var(--line);border-radius:14px;margin-top:26px;overflow:hidden;box-shadow:0 1px 0 rgba(255,255,255,.02) inset,0 18px 40px -28px #000}
+  .step-head{display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid var(--line-soft);background:linear-gradient(180deg,rgba(198,160,82,.05),transparent)}
+  .step-num{font-family:var(--serif);font-weight:700;font-size:15px;width:34px;height:34px;flex:0 0 34px;border-radius:50%;display:grid;place-items:center;color:var(--gold);border:1px solid var(--gold-dim);background:#211f1a}
+  .step-head h2{font-family:var(--serif);font-weight:500;font-size:18px;margin:0;letter-spacing:.04em}
+  .step-head .hint{color:var(--muted-2);font-size:12px;margin-left:auto;font-family:var(--mono)}
+  .step-body{padding:22px 24px}
+  .step.locked{opacity:.45;filter:saturate(.4)}.step.locked .step-body{pointer-events:none}
+  .drop{border:1.5px dashed var(--line);border-radius:12px;background:#1a1923;padding:30px 22px;text-align:center;transition:.18s;cursor:pointer}
+  .drop:hover,.drop.drag{border-color:var(--gold-dim);background:#201e29}
+  .drop .icn{font-size:30px;color:var(--gold);opacity:.8}.drop p{margin:8px 0 2px;font-size:14px}.drop small{color:var(--muted-2)}
+  .or{display:flex;align-items:center;gap:14px;color:var(--muted-2);font-size:12px;margin:18px 0}.or::before,.or::after{content:"";height:1px;flex:1;background:var(--line-soft)}
+  textarea#pasteArea{width:100%;min-height:110px;resize:vertical;background:#16151d;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.6}
+  textarea#pasteArea:focus{outline:none;border-color:var(--gold-dim)}
+  .import-actions{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  button{font-family:var(--sans);cursor:pointer;border:none;border-radius:9px;font-size:14px}
+  .btn{padding:11px 20px;background:linear-gradient(180deg,#2c2937,#23212c);color:var(--ink);border:1px solid var(--line);font-weight:500;letter-spacing:.03em;transition:.15s}
+  .btn:hover{border-color:var(--gold-dim);color:#fff}
+  .btn-primary{background:linear-gradient(180deg,#d2ad5b,#b0883a);color:#241d0a;border:1px solid #e0c074;font-weight:700;letter-spacing:.05em;box-shadow:0 8px 20px -10px rgba(198,160,82,.6)}
+  .btn-primary:hover{filter:brightness(1.06)}.btn-primary:disabled{opacity:.4;cursor:not-allowed;filter:none;box-shadow:none}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);padding:9px 16px}.btn-ghost:hover{color:var(--ink);border-color:var(--gold-dim)}
+  .btn-sm{padding:6px 12px;font-size:12.5px}
+  .parse-status{margin-top:14px;font-size:13px;color:var(--muted);min-height:1.2em}.parse-status b{color:var(--success);font-family:var(--serif)}.parse-status.err b{color:var(--fumble)}
+  .field{display:flex;flex-direction:column;gap:7px}
+  label.lab{font-size:12px;color:var(--muted);letter-spacing:.06em;font-family:var(--mono)}
+  select,input[type=text],input[type=number]{background:#16151d;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:10px 13px;font-family:var(--sans);font-size:14px}
+  select:focus,input:focus{outline:none;border-color:var(--gold-dim)}
+  .pc-meta{font-size:13px;color:var(--muted);font-family:var(--mono);margin-top:14px;line-height:1.8}.pc-meta b{color:var(--gold)}
+  .json-box{background:#1a1923;border:1px solid var(--line);border-radius:11px;padding:14px 15px;margin-bottom:18px}
+  .json-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .json-status{font-size:12.5px;color:var(--muted);flex:1;min-width:200px}.json-status.ok{color:var(--success)}.json-status.warn{color:var(--gold)}.json-status.err{color:var(--fumble)}
+  #jsonPaste{width:100%;margin-top:10px;min-height:60px;resize:vertical;background:#16151d;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-family:var(--mono);font-size:12px}
+  #jsonPaste:focus{outline:none;border-color:var(--gold-dim)}
+  .name-list{display:flex;flex-wrap:wrap;gap:9px}
+  .namechk{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-size:13.5px;background:#1a1923;border:1px solid var(--line);border-radius:9px;padding:8px 13px;transition:.12s}
+  .namechk:hover{border-color:var(--gold-dim)}
+  .namechk input{appearance:none;width:17px;height:17px;border:1.5px solid var(--line);border-radius:5px;background:#16151d;display:grid;place-items:center;cursor:pointer;flex:0 0 17px}
+  .namechk input:checked{background:var(--gold);border-color:var(--gold)}.namechk input:checked::after{content:"✓";color:#241d0a;font-size:11px;font-weight:700}
+  .namechk .cnt{font-family:var(--mono);font-size:11px;color:var(--muted-2)}
+  .hint-line{font-size:12px;color:var(--muted-2);margin:10px 0 0;font-family:var(--mono)}
+  .toggles{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--line-soft)}
+  .chk{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-size:13.5px}
+  .chk input{appearance:none;width:18px;height:18px;border:1.5px solid var(--line);border-radius:5px;background:#16151d;display:grid;place-items:center;cursor:pointer;transition:.12s;flex:0 0 18px}
+  .chk input:checked{background:var(--gold);border-color:var(--gold)}.chk input:checked::after{content:"✓";color:#241d0a;font-size:12px;font-weight:700}
+  .chk:hover input{border-color:var(--gold-dim)}
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .cat{background:#1a1923;border:1px solid var(--line);border-radius:11px;padding:14px 15px}.cat.dim{opacity:.4}
+  .cat h3{margin:0 0 11px;font-family:var(--serif);font-size:14.5px;font-weight:500;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+  .cat h3 .dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px}.cat h3 .ct{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted-2);font-weight:400}
+  .cat.crit h3{color:var(--crit)}.cat.crit .dot{background:var(--crit)}
+  .cat.special h3{color:var(--special)}.cat.special .dot{background:var(--special)}
+  .cat.success h3{color:var(--success)}.cat.success .dot{background:var(--success)}
+  .cat.fumble h3{color:var(--fumble)}.cat.fumble .dot{background:var(--fumble)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:12px;padding:4px 10px;border-radius:20px;background:#222029;border:1px solid var(--line);color:var(--ink);font-family:var(--mono)}
+  .chip .x{color:var(--muted-2);margin-left:5px}.cat .empty{color:var(--muted-2);font-size:12.5px;font-style:italic}
+  .roll-list{max-height:168px;overflow-y:auto;display:flex;flex-direction:column;gap:0;border:1px solid var(--line-soft);border-radius:8px;background:#16151d}
+  .roll-list::-webkit-scrollbar{width:9px}.roll-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}.roll-list::-webkit-scrollbar-track{background:transparent}
+  .roll-line{font-family:var(--mono);font-size:12px;padding:5px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  .roll-line:last-child{border-bottom:none}
+  .ch-shoki{color:var(--shoki)}
+  td.fixed-cell{background:linear-gradient(180deg,rgba(159,207,127,.07),transparent);vertical-align:middle}
+  td.fixed-cell .fixed-lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--shoki);margin-bottom:6px}
+  .col-tag.t-shoki{color:var(--shoki);border-color:#46603a}
+  .rule-intro{font-size:13px;color:var(--muted);margin:0 0 16px}.rule-intro code{font-family:var(--mono);color:var(--gold)}
+  .matrix-scroll{overflow-x:auto}
+  table.matrix{border-collapse:collapse;min-width:560px;width:100%}
+  table.matrix th,table.matrix td{padding:9px 8px;text-align:center;border:1px solid var(--line-soft)}
+  table.matrix thead .grouphead{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);background:rgba(198,160,82,.06);border-bottom:1px solid var(--gold-dim)}
+  table.matrix thead .colhead{font-family:var(--serif);font-size:13.5px;letter-spacing:.03em}
+  table.matrix td.rowhead,table.matrix th.rowhead{font-family:var(--serif);font-size:13.5px;text-align:left;letter-spacing:.03em;white-space:nowrap;background:#1c1b25}
+  table.matrix th.corner{background:transparent;border:none}
+  table.matrix th.sidelabel{writing-mode:vertical-rl;text-orientation:upright;font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--gold);background:rgba(198,160,82,.06);border-right:1px solid var(--gold-dim);padding:6px 3px}
+  table.matrix input.amt{width:84px;text-align:center;font-family:var(--mono);font-size:13px;padding:7px 4px}
+  .rh-crit{color:var(--crit)}.rh-spec{color:var(--special)}.rh-succ{color:var(--success)}.rh-fail{color:var(--fail)}.rh-fumb{color:var(--fumble)}.rh-shoki{color:var(--shoki)}
+  .ch-crit{color:var(--crit)}.ch-spec{color:var(--special)}.ch-succ{color:var(--success)}.ch-fumb{color:var(--fumble)}
+  table.matrix tr.row-shoki td{background:linear-gradient(180deg,rgba(159,207,127,.06),transparent)}
+  .sub-panel{margin-top:24px;border-top:1px solid var(--line-soft);padding-top:20px}
+  .sub-panel h3{font-family:var(--serif);font-size:15.5px;font-weight:500;margin:0 0 4px;letter-spacing:.03em}
+  .sub-panel .desc{font-size:12.5px;color:var(--muted-2);margin:0 0 14px;font-family:var(--mono)}
+  .sub-grid{display:flex;flex-direction:column;gap:9px}
+  .sub-item{display:flex;align-items:center;gap:11px;flex-wrap:wrap;background:#1a1923;border:1px solid var(--line);border-radius:9px;padding:9px 13px}
+  .sub-item.off{opacity:.5}
+  .sub-item .nm{font-family:var(--serif);font-size:14px;min-width:96px}
+  .sub-item .arrow{color:var(--special);font-family:var(--mono)}
+  .sub-item select{padding:6px 9px;font-size:12.5px;min-width:150px}
+  .sub-item .schk input{appearance:none;width:17px;height:17px;border:1.5px solid var(--line);border-radius:4px;background:#16151d;display:grid;place-items:center;cursor:pointer;flex:0 0 17px}
+  .sub-item .schk input:checked{background:var(--special);border-color:var(--special)}.sub-item .schk input:checked::after{content:"✓";color:#0c1c20;font-size:11px;font-weight:700}
+  .sub-empty{color:var(--muted-2);font-size:12.5px;font-style:italic}
+  .judge-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.judge-bar .spacer{flex:1}
+  .results{margin-top:22px;display:none}.results.show{display:block}.res-scroll{overflow-x:auto}
+  table.res{width:100%;border-collapse:collapse;font-size:13px;min-width:780px}
+  table.res th,table.res td{padding:9px 10px;border-bottom:1px solid var(--line-soft);text-align:left;vertical-align:middle}
+  table.res th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);font-weight:400}
+  table.res td.sk{font-family:var(--serif);font-size:14px}
+  table.res .num,table.res th.num{text-align:center;font-family:var(--mono)}
+  table.res input.val{width:58px;text-align:center;font-family:var(--mono);padding:6px 4px;font-size:13px}
+  table.res td.delta{text-align:center;font-family:var(--mono);font-weight:700}.table-up{color:var(--success)}
+  table.res td.delta.up{color:var(--success)}table.res td.delta.zero{color:var(--muted-2)}
+  table.res td.after{text-align:center;font-family:var(--mono);font-weight:700;color:var(--gold)}
+  table.res tr.off{opacity:.32}table.res tr.ability{background:linear-gradient(180deg,rgba(116,182,198,.045),transparent)}
+  .col-tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:10px;border:1px solid var(--line);margin-right:6px}
+  .col-tag.t-crit{color:var(--crit);border-color:var(--gold-dim)}.col-tag.t-spec{color:var(--special);border-color:#3a5a63}.col-tag.t-succ{color:var(--success);border-color:#46603a}.col-tag.t-fumb{color:var(--fumble);border-color:#5e342b}
+  .judg{font-family:var(--mono);font-size:11.5px;line-height:1.55}.judg .roll{color:var(--muted)}
+  .j-crit{color:var(--crit)}.j-spec{color:var(--special)}.j-succ{color:var(--success)}.j-fail{color:var(--fail)}.j-fumb{color:var(--fumble)}.j-none{color:var(--muted-2)}
+  .res-chk input,.sub-chk input{appearance:none;width:17px;height:17px;border:1.5px solid var(--line);border-radius:4px;background:#16151d;display:grid;place-items:center;cursor:pointer;flex:0 0 17px}
+  .res-chk input:checked{background:var(--gold);border-color:var(--gold)}.res-chk input:checked::after{content:"✓";color:#241d0a;font-size:11px;font-weight:700}
+  .sub-chk input:checked{background:var(--special);border-color:var(--special)}.sub-chk input:checked::after{content:"✓";color:#0c1c20;font-size:11px;font-weight:700}
+  .redirect{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.redirect .arrow{color:var(--special);font-family:var(--mono)}.redirect select{padding:5px 8px;font-size:12.5px;min-width:130px}
+  .sub-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--special);font-family:var(--mono)}
+  .totbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:18px;padding:16px 18px;border:1px solid var(--gold-dim);border-radius:11px;background:linear-gradient(180deg,rgba(198,160,82,.08),transparent)}
+  .totbar .big{font-family:var(--serif);font-size:22px;color:var(--gold);font-weight:700}
+  .totbar .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .totbar .spacer{flex:1}
+  .copied{font-size:12px;color:var(--success);font-family:var(--mono);opacity:0;transition:.2s}.copied.show{opacity:1}
+  .foot{margin-top:40px;text-align:center;color:var(--muted-2);font-size:12px;font-family:var(--mono);letter-spacing:.04em}.foot .sep{color:var(--line)}
+  ::selection{background:rgba(198,160,82,.3)}
+  @media(max-width:560px){.wrap{padding:32px 14px 70px}.step-body{padding:18px 16px}.step-head{padding:15px 16px}.cat-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Call of Cthulhu 6th · House Rule</div>
+    <h1 class="title">成長判定の儀</h1>
+    <div class="title-rule"></div>
+    <p class="sub">ココフォリアの全ログから PC のダイス結果を読み取り、抽出結果と成長判定の出目を掛け合わせたマトリクスで技能成長を一括判定します。</p>
+  </header>
+
+  <!-- STEP 1 -->
+  <section class="step" id="step1">
+    <div class="step-head"><span class="step-num">壱</span><h2>ログのインポート</h2><span class="hint">.html / 貼り付け</span></div>
+    <div class="step-body">
+      <div class="drop" id="drop">
+        <div class="icn">📜</div>
+        <p>ココフォリアの書き出しログ（HTML）をここにドロップ</p>
+        <small>またはクリックしてファイルを選択</small>
+        <input type="file" id="fileInput" accept=".html,.htm,text/html" hidden />
+      </div>
+      <div class="or">テキストを直接貼り付ける場合</div>
+      <textarea id="pasteArea" placeholder="ログHTMLのソース、もしくはダイス行のテキストを貼り付け…"></textarea>
+      <div class="import-actions">
+        <button class="btn btn-primary" id="parseBtn">読み込む</button>
+        <button class="btn-ghost btn-sm" id="clearBtn">クリア</button>
+        <span class="parse-status" id="parseStatus"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step locked" id="step2">
+    <div class="step-head"><span class="step-num">弐</span><h2>PC の選択</h2><span class="hint" id="pcCountHint"></span></div>
+    <div class="step-body">
+      <div class="json-box">
+        <div class="json-row">
+          <button class="btn-ghost btn-sm" id="jsonBtn">コマ出力JSONを選択</button>
+          <span class="json-status" id="jsonStatus">JSONを読み込むと、名前で自動選択し、チャットパレットから技能値を取得します（任意）。</span>
+          <input type="file" id="jsonInput" accept=".json,application/json,text/plain" hidden />
+        </div>
+        <textarea id="jsonPaste" placeholder="コマJSONを直接貼り付ける場合はこちら…"></textarea>
+        <div style="margin-top:8px"><button class="btn-ghost btn-sm" id="jsonApply">貼り付けたJSONを適用</button></div>
+      </div>
+      <div class="field"><label class="lab">対象キャラクター（複数選択で別名義を結合）</label>
+        <div class="name-list" id="nameList"></div>
+      </div>
+      <p class="hint-line">同一PCの名前がログ途中で変わっている場合は、該当する名義を複数チェックすると判定が結合されます。</p>
+      <div class="pc-meta" id="pcMeta"></div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step locked" id="step3">
+    <div class="step-head"><span class="step-num">参</span><h2>判定結果の抽出</h2><span class="hint">自動抽出</span></div>
+    <div class="step-body">
+      <div class="toggles">
+        <label class="chk"><input type="checkbox" id="excSuccess"><span>成功を成長対象に含めない</span></label>
+        <label class="chk"><input type="checkbox" id="excSpecial"><span>スペシャルを成長対象に含めない</span></label>
+        <label class="chk"><input type="checkbox" id="mergeSuSp"><span>成功とスペシャルをまとめる</span></label>
+        <label class="chk"><input type="checkbox" id="excSan"><span>SANcを成長対象に含めない</span></label>
+        <label class="chk"><input type="checkbox" id="splitCritShoki"><span>クリティカルと初期値成功を分ける</span></label>
+      </div>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+  </section>
+
+  <!-- STEP 4 -->
+  <section class="step locked" id="step4">
+    <div class="step-head"><span class="step-num">肆</span><h2>成長ルールの設定</h2><span class="hint">1d10 / 3 など</span></div>
+    <div class="step-body">
+      <p class="rule-intro">技能ごとに <code>1D100</code> で成長判定を行い、その<b>出目区分（行）</b>と、ログから<b>抽出したダイス結果（列）</b>の交差するセルの成長量を加算します。各セルは <code>1d10</code>・<code>1d6+1</code>・<code>3</code>・<code>0</code> のように指定できます。</p>
+      <div class="matrix-scroll">
+        <table class="matrix" id="ruleMatrix">
+          <thead>
+            <tr>
+              <th class="corner"></th><th class="corner"></th>
+              <th class="grouphead" colspan="5">抽出したダイス結果</th>
+            </tr>
+            <tr>
+              <th class="corner"></th><th class="corner"></th>
+              <th class="colhead ch-crit">クリティカル</th>
+              <th class="colhead ch-spec">スペシャル</th>
+              <th class="colhead ch-succ">成功</th>
+              <th class="colhead ch-fumb">ファンブル</th>
+              <th class="colhead ch-shoki">初期値成功</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px">
+        <label class="chk"><input type="checkbox" id="shokiJudge"><span>初期値成功：判定をする（OFFのときは判定せず「確定成長」のダイスのみを振る）</span></label>
+      </div>
+      <div class="sub-panel">
+        <h3>代用成長の設定</h3>
+        <p class="desc">アイデア・幸運・知識・能力値（STR/DEX等）・SANなどの能力値ロールは、成長させる技能を選ぶと判定対象になります。</p>
+        <div class="sub-grid" id="subList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5 -->
+  <section class="step locked" id="step5">
+    <div class="step-head"><span class="step-num">伍</span><h2>一括成長判定</h2><span class="hint" id="judgeHint"></span></div>
+    <div class="step-body">
+      <div class="toggles" style="margin-bottom:18px;padding-bottom:16px">
+        <label class="chk"><input type="checkbox" id="cumGrowth"><span>加算成長（成長したら、その値で再度成長判定を繰り返す）</span></label>
+      </div>
+      <div class="judge-bar">
+        <button class="btn btn-primary" id="judgeBtn">成長を判定する</button>
+        <button class="btn-ghost btn-sm" id="rerollBtn" style="display:none">ダイスを振り直す</button>
+        <span class="spacer"></span>
+        <button class="btn-ghost btn-sm" id="copyBtn" style="display:none">結果をコピー</button>
+        <span class="copied" id="copied">コピーしました</span>
+      </div>
+      <div class="results" id="results">
+        <div class="res-scroll">
+          <table class="res">
+            <thead><tr>
+              <th style="width:30px"></th><th>技能</th><th class="num" style="width:70px">技能値</th>
+              <th>成長判定（抽出結果 × 出目）</th><th class="num" style="width:64px">成長量</th><th class="num" style="width:70px">成長後</th>
+            </tr></thead>
+            <tbody id="resBody"></tbody>
+          </table>
+        </div>
+        <div class="totbar">
+          <div><div class="lbl">対象技能</div><div class="big" id="totSkills">0</div></div>
+          <div class="note" style="color:var(--muted-2);font-size:12px;font-family:var(--mono)">能力値ロールは「代用成長」で技能を選ぶと判定されます</div>
+          <div class="spacer"></div>
+          <div style="text-align:right"><div class="lbl">合計成長値</div><div class="big" id="totGrowth">+0</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">成長判定の儀 <span class="sep">·</span> CoC 6th Auto-Growth Tool <span class="sep">·</span> 単一HTML / オフライン動作</div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   CoC 6版 初期技能値（固定値のもの。能力値依存は能力値ロール扱い）
+   ============================================================ */
+const INIT_VALUES = {
+  'キック':25,'組み付き':25,'こぶし／パンチ':50,'こぶし/パンチ':50,'パンチ':50,'頭突き':10,'投擲':25,'マーシャルアーツ':1,
+  '拳銃':20,'サブマシンガン':15,'ショットガン':30,'マシンガン':15,'ライフル':25,
+  '応急手当':30,'鍵開け':1,'隠す':15,'隠れる':10,'聞き耳':25,'忍び歩き':10,'写真術':10,'精神分析':1,'追跡':10,'登攀':40,'図書館':25,'目星':25,
+  '運転':20,'運転（自動車）':20,'運転(自動車)':20,'機械修理':20,'重機械操作':1,'乗馬':5,'水泳':25,'製作':5,'操縦':1,'跳躍':25,'電気修理':10,'ナビゲート':10,'変装':1,
+  '言いくるめ':5,'信用':15,'説得':15,'値切り':5,
+  '医学':5,'オカルト':5,'化学':1,'経理':10,'考古学':1,'コンピューター':1,'心理学':5,'人類学':1,'生物学':1,'地質学':1,'電子工学':1,'天文学':1,'博物学':10,'物理学':1,'法律':5,'薬学':1,'歴史':20,'芸術':5,'美術':5
+};
+const SKILL_LIST = [
+  '回避','キック','組み付き','こぶし／パンチ','頭突き','投擲','マーシャルアーツ','拳銃','サブマシンガン','ショットガン','マシンガン','ライフル',
+  '応急手当','鍵開け','隠す','隠れる','聞き耳','忍び歩き','写真術','精神分析','追跡','登攀','図書館','目星',
+  '運転（自動車）','機械修理','重機械操作','乗馬','水泳','製作','操縦','跳躍','電気修理','ナビゲート','変装',
+  '言いくるめ','信用','説得','値切り','母国語',
+  '医学','オカルト','化学','経理','考古学','コンピューター','心理学','人類学','生物学','地質学','電子工学','天文学','博物学','物理学','法律','薬学','歴史','芸術','美術'
+];
+const ABILITY_NAMES = new Set(['アイデア','幸運','知識','クトゥルフ神話','正気度ロール','正気度','SAN','SANチェック','STR','CON','POW','DEX','APP','SIZ','INT','EDU']);
+function normSkill(s){ return String(s).replace(/\s+/g,'').replace(/[／/]/g,'/').replace(/[×＊*]/g,'×'); }
+function isAbilityRoll(skill){ return /[×＊*]/.test(skill) || ABILITY_NAMES.has(normSkill(skill)); }
+const INIT_VALUES_NORM = {}; for(const k in INIT_VALUES){ INIT_VALUES_NORM[normSkill(k)] = INIT_VALUES[k]; }
+
+/* ============================================================
+   状態
+   ============================================================ */
+const STATE = { rollsByPc:{}, pcOrder:[], selectedNames:[], pool:[], poolRolls:[], resultRows:null, substitutions:{},
+                matrix:{}, shokiFixed:'1d10',
+                paletteValues:{}, paletteLoaded:false, paletteName:'' };
+
+/* 結果区分 */
+const COLS = ['crit','special','success','fumble','shoki'];   // 抽出したダイス結果（列）※初期値成功が最右
+const ROWS = ['crit','special','success','fail','fumble'];    // 成長判定の出目区分（行）
+const LABEL = {crit:'クリティカル',special:'スペシャル',success:'成功',fail:'失敗',fumble:'ファンブル',shoki:'初期値成功'};
+const ROWCLS = {crit:'rh-crit',special:'rh-spec',success:'rh-succ',fail:'rh-fail',fumble:'rh-fumb'};
+const COLCLS = {crit:'ch-crit',special:'ch-spec',success:'ch-succ',fumble:'ch-fumb',shoki:'ch-shoki'};
+const JCLS   = {crit:'j-crit',special:'j-spec',success:'j-succ',fail:'j-fail',fumble:'j-fumb'};
+const TAGCLS = {crit:'t-crit',special:'t-spec',success:'t-succ',fumble:'t-fumb',shoki:'t-shoki'};
+
+/* デフォルト：全セル 1d10、確定成長も 1d10 */
+const DEFAULT_AMT = '1d10';
+const DEFAULT_SHOKI_FIXED = '1d10';
+// マトリクス初期化（全セル 1d10）
+ROWS.forEach(r=>{ STATE.matrix[r]={}; COLS.forEach(c=>{ STATE.matrix[r][c]=DEFAULT_AMT; }); });
+STATE.shokiFixed = DEFAULT_SHOKI_FIXED;
+
+/* SAN系判定の名称 */
+function sanKey(s){ return normSkill(s).toUpperCase(); }
+const SAN_KEYS = new Set(['SANC','SANチェック','SAN','正気度判定','正気度','正気度ロール','SAN値チェック'].map(sanKey));
+function isSanCheck(skill){ return SAN_KEYS.has(sanKey(skill)); }
+
+/* 技能値が6版初期値と一致するか */
+function isInitialValue(skill, value){
+  const k=normSkill(skill);
+  return (k in INIT_VALUES_NORM) && INIT_VALUES_NORM[k]===value;
+}
+
+/* 結果文字列 → 区分（クリティカル＝決定的成功＝決定的成功/スペシャル、ファンブル＝致命的失敗） */
+const RESULTS=['決定的成功/スペシャル','クリティカル/スペシャル','決定的成功','クリティカル','スペシャル','致命的失敗','ファンブル','成功','失敗'];
+const RES_RE=new RegExp('＞\\s*('+RESULTS.map(r=>r.replace(/[/]/g,'\\/')).join('|')+')\\s*$');
+const ROLL_RE=/\(1D100<=(\d+)\)\s*＞\s*(\d+)/;
+function normResult(r){
+  if(r==='決定的成功'||r==='クリティカル'||r==='決定的成功/スペシャル'||r==='クリティカル/スペシャル') return 'crit';
+  if(r==='スペシャル') return 'special';
+  if(r==='成功') return 'success';
+  if(r==='致命的失敗'||r==='ファンブル') return 'fumble';
+  if(r==='失敗') return 'fail';
+  return null;
+}
+/* 技能名の抽出：【】《》 → 無ければ <=値 と (1D100 の間のテキスト */
+function extractSkill(c){
+  const mb=c.match(/【([^】]+)】|《([^》]+)》/);
+  if(mb) return (mb[1]||mb[2]).trim();
+  const m2=c.match(/<=\s*[\d*+\-]+\s+(.+?)\s*\(1D100/);
+  if(m2) return m2[1].trim();
+  return '（技能名なし）';
+}
+
+/* 成長判定ロール（1D100）の出目区分 — BCDice CoC6版準拠 */
+function classifyGrowthRow(roll, value){
+  if(roll<=5) return 'crit';
+  if(roll>=96) return 'fumble';
+  if(roll<=Math.floor(value/5)) return 'special';
+  if(roll<=value) return 'success';
+  return 'fail';
+}
+
+/* 技能値の解決：パレット値 → 初期値 → ログ値 */
+function resolveValue(skill, logTarget){
+  const k=normSkill(skill);
+  if(STATE.paletteLoaded){
+    if(k in STATE.paletteValues) return STATE.paletteValues[k];
+    if(k in INIT_VALUES_NORM) return INIT_VALUES_NORM[k];
+    return (logTarget!=null?logTarget:25);
+  }
+  if(logTarget!=null) return logTarget;
+  if(k in INIT_VALUES_NORM) return INIT_VALUES_NORM[k];
+  return 25;
+}
+
+/* ============================================================
+   ログ解析
+   ============================================================ */
+function parseLog(raw){
+  const rollsByPc={}, order=[]; let blocks=[]; let usedDom=false;
+  if(/<p[\s>]/i.test(raw)){
+    try{
+      const doc=new DOMParser().parseFromString(raw,'text/html');
+      const ps=doc.querySelectorAll('p');
+      if(ps.length){ usedDom=true;
+        ps.forEach(p=>{
+          const spans=p.querySelectorAll(':scope > span');
+          if(spans.length<3)return;
+          blocks.push({name:(spans[1].textContent||'').trim(),content:(spans[spans.length-1].textContent||'').trim()});
+        });
+      }
+    }catch(e){usedDom=false;}
+  }
+  if(!usedDom){ raw.split(/\r?\n/).forEach(line=>{const t=line.replace(/<[^>]+>/g,'').trim();if(t)blocks.push({name:'(名前不明)',content:t});}); }
+  blocks.forEach(({name,content})=>{
+    const c=content.replace(/\s+/g,' ').trim();
+    const mRes=c.match(RES_RE); if(!mRes)return;
+    const mRoll=c.match(ROLL_RE); if(!mRoll)return;
+    const norm=normResult(mRes[1]); if(!norm)return;
+    const skill=extractSkill(c);
+    const target=parseInt(mRoll[1],10);
+    const atInitial=isInitialValue(skill,target);   // 技能値が6版初期値か
+    if(!rollsByPc[name]){rollsByPc[name]=[];order.push(name);}
+    rollsByPc[name].push({skill,target,rolled:parseInt(mRoll[2],10),result:norm,atInitial});
+  });
+  return {rollsByPc,order};
+}
+
+/* ============================================================
+   ダイス式評価
+   ============================================================ */
+function rollExpr(expr){
+  const src=String(expr||'').trim().replace(/[＋]/g,'+').replace(/[－ー]/g,'-').replace(/[Ｄ]/g,'d').replace(/\s+/g,'').toLowerCase();
+  if(src===''||src==='0')return{total:0,detail:'0',hasDice:false};
+  const terms=src.match(/[+-]?[^+-]+/g); if(!terms)return{total:0,detail:'?',hasDice:false};
+  let total=0; const parts=[]; let hasDice=false;
+  for(let term of terms){
+    let sign=1; if(term[0]==='+')term=term.slice(1); else if(term[0]==='-'){sign=-1;term=term.slice(1);}
+    const md=term.match(/^(\d*)d(\d+)$/);
+    if(md){ const n=md[1]===''?1:parseInt(md[1],10), f=parseInt(md[2],10); if(f<=0||n>500)continue;
+      hasDice=true; const rolls=[]; for(let i=0;i<n;i++)rolls.push(1+Math.floor(Math.random()*f));
+      const s=rolls.reduce((a,b)=>a+b,0); total+=sign*s; parts.push((sign<0?'-':'')+n+'d'+f+'['+rolls.join(',')+']');
+    }else if(/^\d+$/.test(term)){ total+=sign*parseInt(term,10); parts.push((sign<0?'-':'')+term); }
+  }
+  return {total,detail:parts.join('+').replace(/\+\-/g,'-')||'?',hasDice};
+}
+function exprValid(expr){
+  const src=String(expr||'').trim().replace(/[＋]/g,'+').replace(/[－ー]/g,'-').replace(/[Ｄ]/g,'d').replace(/\s+/g,'').toLowerCase();
+  if(src===''||src==='0')return true;
+  const terms=src.match(/[+-]?[^+-]+/g); if(!terms)return false;
+  return terms.every(t=>{t=t.replace(/^[+-]/,'');return /^(\d*)d(\d+)$/.test(t)||/^\d+$/.test(t);});
+}
+
+/* ============================================================
+   ココフォリア コマ出力JSON
+   ============================================================ */
+function getCharData(obj){
+  if(!obj||typeof obj!=='object')return null;
+  if(obj.data&&(obj.data.name!==undefined||obj.data.commands!==undefined))return obj.data;
+  if(obj.name!==undefined||obj.commands!==undefined)return obj;
+  if(Array.isArray(obj)){for(const o of obj){const c=getCharData(o);if(c)return c;}}
+  return null;
+}
+function evalNum(s){ s=String(s).replace(/\s+/g,''); if(/^[0-9*+\-]+$/.test(s)){ try{const v=Function('"use strict";return('+s+')')();return(typeof v==='number'&&isFinite(v))?v:null;}catch(e){return null;} } return null; }
+function buildVars(ch){ const v={}; (ch.params||[]).forEach(p=>{if(p&&p.label!=null)v[String(p.label).trim().toUpperCase()]=p.value;}); (ch.status||[]).forEach(s=>{if(s&&s.label!=null)v[String(s.label).trim().toUpperCase()]=s.value;}); return v; }
+function substVars(commands,vars){ return String(commands||'').replace(/\{([^}]+)\}/g,(m,key)=>{const k=String(key).trim().toUpperCase();return (k in vars)?String(vars[k]):m;}); }
+function parsePalette(commands){
+  const map={};
+  String(commands||'').split(/\r?\n/).forEach(l=>{
+    const m=l.match(/<=\s*([0-9][0-9*+\-]*)[^【《\n]*[【《]([^】》]+)[】》]/) || l.match(/<=\s*([0-9][0-9*+\-]*)\s+([^(\n]+?)\s*\(1D100/i);
+    if(m){ const v=evalNum(m[1]); const name=m[2].trim(); if(v!=null){ const k=normSkill(name); if(!(k in map)) map[k]=v; } }
+  });
+  return map;
+}
+function applyCharacterJson(text){
+  const status=document.getElementById('jsonStatus');
+  let obj; try{ obj=JSON.parse(text); }catch(e){ status.className='json-status err'; status.textContent='JSONの解析に失敗しました。'; return; }
+  const ch=getCharData(obj);
+  if(!ch){ status.className='json-status err'; status.textContent='キャラクターデータが見つかりませんでした。'; return; }
+  const name=(ch.name||'').trim();
+  const values=parsePalette(substVars(ch.commands, buildVars(ch)));
+  const count=Object.keys(values).length;
+  STATE.paletteValues=values; STATE.paletteLoaded=true; STATE.paletteName=name;
+  const norm=s=>String(s).replace(/\s+/g,'');
+  const match=STATE.pcOrder.find(n=>n===name)||STATE.pcOrder.find(n=>norm(n)===norm(name))||STATE.pcOrder.find(n=>norm(n).includes(norm(name))||norm(name).includes(norm(n)));
+  if(match){
+    setCheckedNames([match]); selectNames();
+    status.className='json-status ok';
+    status.textContent='✓「'+name+'」を自動選択（技能値 '+count+' 件読込）。別名義があれば追加でチェックしてください。';
+  }else{
+    if(STATE.selectedNames.length) selectNames();
+    status.className='json-status warn';
+    status.textContent='⚠ ログ内に「'+name+'」が見つかりません。名義をチェックしてください（技能値 '+count+' 件読込）。';
+  }
+}
+
+/* ============================================================
+   プール構築（選択した名義をまとめて集計）
+   ============================================================ */
+/* ロールのカテゴリ（抽出列）。分ける設定で初期値クリティカルの扱いが変わる */
+function getSeparate(){ const el=document.getElementById('splitCritShoki'); return el?el.checked:false; }
+function rollCategory(result, atInitial, separate){
+  if(atInitial){
+    if(result==='success') return 'shoki';            // 初期値での成功 → 初期値成功
+    if(result==='crit' && !separate) return 'shoki';  // 分けない → 初期値クリティカルも初期値成功
+  }
+  return result;                                       // crit/special/success/fail/fumble
+}
+/* 選択名義から pool（技能集計）と poolRolls（個別ロール）を再構築 */
+function rebuildPool(){
+  const sep=getSeparate();
+  const map=new Map(); const rolls=[];
+  STATE.selectedNames.forEach(pc=>{
+    (STATE.rollsByPc[pc]||[]).forEach(r=>{
+      const cat=rollCategory(r.result, r.atInitial, sep);
+      if(!map.has(r.skill)) map.set(r.skill,{skill:r.skill,value:r.target,ability:isAbilityRoll(r.skill),counts:{crit:0,special:0,success:0,shoki:0,fail:0,fumble:0}});
+      const a=map.get(r.skill); a.value=resolveValue(r.skill,r.target); a.counts[cat]++;
+      if(cat!=='fail') rolls.push({skill:r.skill, target:r.target, cat});
+    });
+  });
+  STATE.pool=[...map.values()]; STATE.poolRolls=rolls;
+}
+/* 抽出した結果の列（best）。crit > special > 初期値成功 > 成功 > ファンブル。除外・まとめ尊重 */
+function bestColumn(a){
+  const excS=document.getElementById('excSuccess').checked;
+  const excSp=document.getElementById('excSpecial').checked;
+  const merge=document.getElementById('mergeSuSp').checked;
+  const excSan=document.getElementById('excSan').checked;
+  if(excSan && isSanCheck(a.skill)) return null;
+  const c=a.counts;
+  if(c.crit>0) return 'crit';
+  if(!merge && c.special>0 && !excSp) return 'special';
+  if(merge && ((c.special>0&&!excSp)||(c.success>0&&!excS))) {
+    if(c.shoki>0) return 'shoki';
+    return 'success';
+  }
+  if(c.shoki>0) return 'shoki';
+  if(c.success>0 && !excS) return 'success';
+  if(c.fumble>0) return 'fumble';
+  return null;
+}
+
+/* ============================================================
+   抽出表示（列＝クリティカル/スペシャル/成功/ファンブル）
+   ============================================================ */
+function renderExtraction(){
+  const excS=document.getElementById('excSuccess').checked;
+  const excSp=document.getElementById('excSpecial').checked;
+  const merge=document.getElementById('mergeSuSp').checked;
+  const excSan=document.getElementById('excSan').checked;
+  const g={crit:[],special:[],success:[],fumble:[],shoki:[]};
+  STATE.poolRolls.forEach(r=>{
+    if(excSan && isSanCheck(r.skill)) return;
+    if(g[r.cat]) g[r.cat].push(r);
+  });
+  const grid=document.getElementById('catGrid'); grid.innerHTML='';
+  grid.appendChild(catCard('crit','クリティカル',g.crit,false));
+  if(merge){
+    grid.appendChild(catCard('success','成功・スペシャル',[...g.special,...g.success],(excS&&excSp)));
+  }else{
+    grid.appendChild(catCard('special','スペシャル',g.special,excSp));
+    grid.appendChild(catCard('success','成功',g.success,excS));
+  }
+  grid.appendChild(catCard('fumble','ファンブル',g.fumble,false));
+  grid.appendChild(catCard('shoki','初期値成功',g.shoki,false));
+}
+function catCard(cls,title,rolls,dim){
+  const div=document.createElement('div'); div.className='cat '+cls+(dim?' dim':'');
+  const list=rolls.length
+    ? '<div class="roll-list">'+rolls.map(r=>'<div class="roll-line">CCB&lt;='+r.target+' 【'+esc(r.skill)+'】</div>').join('')+'</div>'
+    : '<div class="empty">該当なし</div>';
+  div.innerHTML='<h3><span class="dot"></span>'+title+'<span class="ct">'+rolls.length+'件</span></h3>'+list;
+  return div;
+}
+
+/* 代用成長パネル（成長ルールの下） */
+function renderSubPanel(){
+  const box=document.getElementById('subList'); box.innerHTML='';
+  const abilities=STATE.pool.filter(a=>a.ability && bestColumn(a));
+  if(!abilities.length){ box.innerHTML='<div class="sub-empty">代用成長の対象となる能力値ロールはありません。</div>'; return; }
+  abilities.forEach(a=>{
+    if(!STATE.substitutions[a.skill]) STATE.substitutions[a.skill]={active:false,target:''};
+    const sub=STATE.substitutions[a.skill];
+    const opts='<option value="">（成長させる技能を選択）</option>'+SKILL_LIST.map(s=>'<option value="'+esc(s)+'" '+(sub.target===s?'selected':'')+'>'+esc(s)+'</option>').join('');
+    const item=document.createElement('div'); item.className='sub-item'+((sub.active&&sub.target)?'':' off');
+    item.innerHTML='<label class="schk"><input type="checkbox" data-subchk="'+esc(a.skill)+'" '+(sub.active?'checked':'')+'></label>'
+                 +'<span class="nm">'+esc(a.skill)+'</span><span class="arrow">→</span>'
+                 +'<select data-subsel="'+esc(a.skill)+'">'+opts+'</select>';
+    box.appendChild(item);
+  });
+  box.querySelectorAll('input[data-subchk]').forEach(cb=>cb.addEventListener('change',e=>{
+    STATE.substitutions[e.target.dataset.subchk].active=e.target.checked; afterSubChange();
+  }));
+  box.querySelectorAll('select[data-subsel]').forEach(sel=>sel.addEventListener('change',e=>{
+    const sk=e.target.dataset.subsel; STATE.substitutions[sk].target=e.target.value;
+    if(e.target.value) STATE.substitutions[sk].active=true;
+    afterSubChange();
+  }));
+}
+function afterSubChange(){
+  renderSubPanel(); updateJudgeHint();
+  if(STATE.resultRows) judge();
+}
+
+/* ============================================================
+   成長ルールマトリクス
+   ============================================================ */
+function renderMatrix(){
+  const judgeOn=document.getElementById('shokiJudge').checked;
+  const body=document.getElementById('matrixBody'); body.innerHTML='';
+  ROWS.forEach((row,ri)=>{
+    const tr=document.createElement('tr');
+    let cells='';
+    if(ri===0) cells+='<th class="sidelabel" rowspan="'+ROWS.length+'">成長判定時の結果区分</th>';
+    cells+='<td class="rowhead '+ROWCLS[row]+'">'+LABEL[row]+'</td>';
+    ['crit','special','success','fumble'].forEach(col=>{
+      cells+='<td><input class="amt" type="text" data-r="'+row+'" data-c="'+col+'" value="'+esc(STATE.matrix[row][col])+'"></td>';
+    });
+    if(judgeOn){
+      cells+='<td><input class="amt" type="text" data-r="'+row+'" data-c="shoki" value="'+esc(STATE.matrix[row].shoki)+'"></td>';
+    }else if(ri===0){
+      cells+='<td rowspan="'+ROWS.length+'" class="fixed-cell"><div class="fixed-lbl">確定成長</div><input class="amt" type="text" id="m-shoki-fixed" value="'+esc(STATE.shokiFixed)+'"></td>';
+    }
+    tr.innerHTML=cells; body.appendChild(tr);
+  });
+  body.querySelectorAll('input.amt[data-r]').forEach(el=>{
+    el.addEventListener('input',()=>{ STATE.matrix[el.dataset.r][el.dataset.c]=el.value; el.style.borderColor=exprValid(el.value)?'':'var(--fumble)'; });
+  });
+  const fx=document.getElementById('m-shoki-fixed');
+  if(fx) fx.addEventListener('input',()=>{ STATE.shokiFixed=fx.value; fx.style.borderColor=exprValid(fx.value)?'':'var(--fumble)'; });
+}
+function matrixValid(){
+  const okCells=ROWS.every(r=>COLS.every(c=>exprValid(STATE.matrix[r][c])));
+  return okCells && exprValid(STATE.shokiFixed);
+}
+
+/* ============================================================
+   成長判定（1行）
+   ============================================================ */
+function rollRow(row){
+  const cumulative=document.getElementById('cumGrowth').checked;
+  const shokiJudge=document.getElementById('shokiJudge').checked;
+  if(!row.active){ row.steps=[]; row.growth=0; return; }
+  const M=STATE.matrix;
+  const col=row.column;
+  const judgeSkill=row.redirectTo||row.skill;
+
+  // 初期値成功列 かつ 判定をする OFF → 判定せず、確定成長のダイスのみ
+  if(col==='shoki' && !shokiJudge){
+    const g=rollExpr(STATE.shokiFixed);
+    row.steps=[{fixed:true, growth:g.total, detail:g.hasDice?g.detail:null}];
+    row.growth=g.total;
+    return;
+  }
+
+  // 通常：1D100 → 出目区分（行）→ M[行][列] の成長ダイス（加算成長対応）
+  let value=row.value, total=0, guard=0; const steps=[];
+  do{
+    const d=1+Math.floor(Math.random()*100);
+    const oc=classifyGrowthRow(d,value);
+    const g=rollExpr(M[oc][col]);
+    steps.push({d,oc,growth:g.total,detail:g.hasDice?g.detail:null});
+    total+=g.total; value+=g.total; guard++;
+    if(!cumulative) break;
+    if(g.total<=0) break;
+    if(value>=100) break;
+    if(guard>=50) break;
+  }while(true);
+  row.steps=steps; row.growth=total;
+}
+
+/* ============================================================
+   一括成長判定
+   ============================================================ */
+function judge(){
+  const rows=[];
+  STATE.pool.forEach(a=>{
+    const col=bestColumn(a);
+    if(!col) return;
+    if(a.ability){
+      const sub=STATE.substitutions[a.skill];
+      if(!sub||!sub.active||!sub.target) return;        // 代用先未設定 → 判定しない
+      const inPool=STATE.pool.find(p=>normSkill(p.skill)===normSkill(sub.target));
+      const r={ skill:a.skill, ability:true, redirectTo:sub.target, column:col,
+                value:resolveValue(sub.target, inPool?inPool.value:null), active:true, steps:[], growth:0 };
+      rollRow(r); rows.push(r);
+    }else{
+      const r={ skill:a.skill, ability:false, redirectTo:null, column:col,
+                value:a.value, active:true, steps:[], growth:0 };
+      rollRow(r); rows.push(r);
+    }
+  });
+  STATE.resultRows=rows; renderResults();
+  const any=rows.length>0;
+  document.getElementById('rerollBtn').style.display=any?'':'none';
+  document.getElementById('copyBtn').style.display=any?'':'none';
+}
+function renderResults(){
+  const body=document.getElementById('resBody'); body.innerHTML='';
+  const rows=STATE.resultRows||[];
+  if(!rows.length){ body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted-2);padding:24px">成長対象の技能がありません。</td></tr>'; }
+  rows.forEach((row,idx)=>{
+    const tr=document.createElement('tr');
+    tr.className=(row.ability?'ability ':'')+(row.active?'':'off');
+    const ctrl='<label class="res-chk"><input type="checkbox" data-inc="'+idx+'" '+(row.active?'checked':'')+'></label>';
+    const skCell = row.ability
+      ? '<div class="redirect"><span>'+esc(row.skill)+'</span><span class="arrow">→</span><span>'+esc(row.redirectTo||'?')+'</span><span class="sub-label">代用成長</span></div>'
+      : esc(row.skill);
+    const tag='<span class="col-tag '+TAGCLS[row.column]+'">抽出:'+LABEL[row.column]+'</span>';
+    let judg;
+    if(!row.active){ judg='<span class="j-none">対象外</span>'; }
+    else{
+      judg=tag+row.steps.map(s=>{
+        if(s.fixed) return '<span class="j-shoki">確定成長（判定なし）</span>'+(s.detail?'<span class="roll">'+esc(s.detail)+'</span>':'');
+        return '<span class="roll">'+s.d+'→</span><span class="'+JCLS[s.oc]+'">'+LABEL[s.oc]+'</span>'+(s.detail?'<span class="roll">'+esc(s.detail)+'</span>':'');
+      }).join('<span class="roll"> ・ </span>');
+    }
+    const up=row.active&&row.growth>0;
+    tr.innerHTML='<td>'+ctrl+'</td><td class="sk">'+skCell+'</td>'+
+      '<td class="num"><input class="val" type="number" data-val="'+idx+'" value="'+row.value+'" min="0" '+(row.active?'':'disabled')+'></td>'+
+      '<td><div class="judg">'+judg+'</div></td>'+
+      '<td class="delta '+(up?'up':'zero')+'">'+(row.active?(row.growth>=0?'+':'')+row.growth:'—')+'</td>'+
+      '<td class="after">'+(row.active?(row.value+row.growth):'—')+'</td>';
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('input[data-inc]').forEach(cb=>cb.addEventListener('change',e=>{const i=+e.target.dataset.inc;STATE.resultRows[i].active=e.target.checked;rollRow(STATE.resultRows[i]);renderResults();}));
+  body.querySelectorAll('input[data-val]').forEach(inp=>inp.addEventListener('change',e=>{const i=+e.target.dataset.val;const v=parseInt(e.target.value,10);if(!isNaN(v)){STATE.resultRows[i].value=v;rollRow(STATE.resultRows[i]);renderResults();}}));
+  document.getElementById('results').classList.add('show');
+  updateTotals();
+}
+function updateTotals(){
+  const rows=(STATE.resultRows||[]).filter(r=>r.active);
+  document.getElementById('totSkills').textContent=rows.length;
+  const g=rows.reduce((a,b)=>a+b.growth,0);
+  document.getElementById('totGrowth').textContent=(g>=0?'+':'')+g;
+}
+
+/* ============================================================
+   フロー制御
+   ============================================================ */
+function unlock(id){document.getElementById(id).classList.remove('locked');}
+function lock(id){document.getElementById(id).classList.add('locked');}
+
+function onParse(){
+  const status=document.getElementById('parseStatus');
+  const raw=document.getElementById('pasteArea').value.trim();
+  if(!raw){status.className='parse-status err';status.innerHTML='<b>ログが空です。</b>';return;}
+  const {rollsByPc,order}=parseLog(raw);
+  const valid=order.filter(n=>rollsByPc[n]&&rollsByPc[n].length);
+  if(!valid.length){ status.className='parse-status err'; status.innerHTML='<b>判定ロールが見つかりませんでした。</b> CCB/1D100判定を含むログをご確認ください。'; lock('step2');lock('step3');lock('step4');lock('step5'); return; }
+  STATE.rollsByPc=rollsByPc; STATE.pcOrder=valid;
+  const total=valid.reduce((a,n)=>a+rollsByPc[n].length,0);
+  status.className='parse-status'; status.innerHTML='<b>'+valid.length+'名義</b>、計 <b>'+total+'件</b> の判定を抽出しました。';
+  renderNameList();
+  // 既定：最も判定数の多い名義を選択
+  const top=[...valid].sort((a,b)=>rollsByPc[b].length-rollsByPc[a].length)[0];
+  setCheckedNames([top]); unlock('step2'); selectNames();
+}
+
+function renderNameList(){
+  const box=document.getElementById('nameList'); box.innerHTML='';
+  STATE.pcOrder.forEach(n=>{
+    const cnt=STATE.rollsByPc[n].length;
+    const lab=document.createElement('label'); lab.className='namechk';
+    lab.innerHTML='<input type="checkbox" value="'+esc(n)+'"><span>'+esc(n)+'</span><span class="cnt">'+cnt+'件</span>';
+    box.appendChild(lab);
+  });
+  box.querySelectorAll('input').forEach(cb=>cb.addEventListener('change',selectNames));
+  document.getElementById('pcCountHint').textContent=STATE.pcOrder.length+'名義';
+}
+function setCheckedNames(names){
+  const set=new Set(names);
+  document.querySelectorAll('#nameList input').forEach(cb=>{cb.checked=set.has(cb.value);});
+}
+function selectNames(){
+  STATE.selectedNames=[...document.querySelectorAll('#nameList input:checked')].map(cb=>cb.value);
+  if(!STATE.selectedNames.length){ document.getElementById('pcMeta').innerHTML='名義を1つ以上選択してください。'; lock('step3');lock('step4');lock('step5'); document.getElementById('results').classList.remove('show'); return; }
+  rebuildPool();
+  const t={crit:0,special:0,success:0,fail:0,fumble:0}; let n=0;
+  STATE.selectedNames.forEach(nm=>(STATE.rollsByPc[nm]||[]).forEach(r=>{t[r.result]++;n++;}));
+  document.getElementById('pcMeta').innerHTML=
+    '選択名義 <b>'+STATE.selectedNames.length+'</b> ／ 判定 <b>'+n+'</b>件 ／ 技能 <b>'+STATE.pool.length+'</b>種 ＝ '+
+    'クリティカル <b>'+t.crit+'</b>・スペシャル <b>'+t.special+'</b>・成功 <b>'+t.success+'</b>・失敗 <b>'+t.fail+'</b>・ファンブル <b>'+t.fumble+'</b>';
+  renderExtraction();
+  renderSubPanel();
+  unlock('step3');unlock('step4');unlock('step5');
+  STATE.resultRows=null; document.getElementById('results').classList.remove('show');
+  document.getElementById('rerollBtn').style.display='none'; document.getElementById('copyBtn').style.display='none';
+  updateJudgeHint();
+}
+function updateJudgeHint(){
+  const n=STATE.pool.filter(a=>bestColumn(a)).length;
+  const ab=STATE.pool.filter(a=>bestColumn(a)&&a.ability).length;
+  document.getElementById('judgeHint').textContent='対象 '+n+' 技能'+(ab?'（内 能力値ロール '+ab+'）':'');
+}
+
+/* ============================================================
+   コピー
+   ============================================================ */
+function copyResults(){
+  const rows=(STATE.resultRows||[]).filter(r=>r.active); if(!rows.length)return;
+  const lines=['【'+STATE.selectedNames.join('／')+' 成長判定結果】'];
+  rows.forEach(r=>{ const name=r.ability&&r.redirectTo?(r.skill+'→'+r.redirectTo):r.skill; lines.push(name+'：'+r.value+' → '+(r.value+r.growth)+'（'+(r.growth>=0?'+':'')+r.growth+'）'); });
+  const tot=rows.reduce((a,b)=>a+b.growth,0); lines.push('────────'); lines.push('対象 '+rows.length+'技能 / 合計成長 '+(tot>=0?'+':'')+tot);
+  const text=lines.join('\n');
+  const done=()=>{const c=document.getElementById('copied');c.classList.add('show');setTimeout(()=>c.classList.remove('show'),1600);};
+  navigator.clipboard.writeText(text).then(done).catch(()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();done();});
+}
+
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+/* ============================================================
+   イベント
+   ============================================================ */
+const drop=document.getElementById('drop'),fileInput=document.getElementById('fileInput');
+drop.addEventListener('click',()=>fileInput.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)readFile(f);});
+fileInput.addEventListener('change',e=>{const f=e.target.files[0];if(f)readFile(f);});
+function readFile(f){const rd=new FileReader();rd.onload=ev=>{document.getElementById('pasteArea').value=ev.target.result;onParse();};rd.readAsText(f,'UTF-8');}
+
+document.getElementById('parseBtn').addEventListener('click',onParse);
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  document.getElementById('pasteArea').value='';
+  const s=document.getElementById('parseStatus');s.innerHTML='';s.className='parse-status';
+  STATE.paletteValues={};STATE.paletteLoaded=false;STATE.paletteName='';STATE.selectedNames=[];STATE.substitutions={};
+  document.getElementById('jsonPaste').value='';
+  const js=document.getElementById('jsonStatus');js.className='json-status';js.textContent='JSONを読み込むと、名前で自動選択し、チャットパレットから技能値を取得します（任意）。';
+  document.getElementById('nameList').innerHTML='';
+  lock('step2');lock('step3');lock('step4');lock('step5');
+  document.getElementById('results').classList.remove('show');
+});
+
+const jsonInput=document.getElementById('jsonInput');
+document.getElementById('jsonBtn').addEventListener('click',()=>jsonInput.click());
+jsonInput.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{document.getElementById('jsonPaste').value=ev.target.result;applyCharacterJson(ev.target.result);};rd.readAsText(f,'UTF-8');});
+document.getElementById('jsonApply').addEventListener('click',()=>{const t=document.getElementById('jsonPaste').value.trim();if(!t){const s=document.getElementById('jsonStatus');s.className='json-status err';s.textContent='JSONが空です。';return;}applyCharacterJson(t);});
+
+['excSuccess','excSpecial','mergeSuSp','excSan'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+  renderExtraction(); renderSubPanel(); updateJudgeHint();
+  if(STATE.resultRows) judge();
+}));
+document.getElementById('splitCritShoki').addEventListener('change',()=>{
+  rebuildPool(); renderExtraction(); renderSubPanel(); updateJudgeHint();
+  if(STATE.resultRows) judge();
+});
+document.getElementById('cumGrowth').addEventListener('change',()=>{if(STATE.resultRows){STATE.resultRows.forEach(r=>rollRow(r));renderResults();}});
+document.getElementById('shokiJudge').addEventListener('change',()=>{renderMatrix();if(STATE.resultRows){STATE.resultRows.forEach(r=>rollRow(r));renderResults();}});
+
+document.getElementById('judgeBtn').addEventListener('click',()=>{
+  if(!matrixValid()){ ROWS.forEach(row=>COLS.forEach(col=>{const el=document.getElementById('m-'+row+'-'+col);if(!exprValid(el.value))el.style.borderColor='var(--fumble)';})); return; }
+  judge();
+});
+document.getElementById('rerollBtn').addEventListener('click',()=>{ if(!STATE.resultRows)return; STATE.resultRows.forEach(r=>rollRow(r)); renderResults(); });
+document.getElementById('copyBtn').addEventListener('click',copyResults);
+
+renderMatrix();
+</script>
+</body>
+</html>
