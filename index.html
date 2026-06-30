@@ -210,6 +210,7 @@
         <label class="chk"><input type="checkbox" id="mergeSuSp"><span>成功とスペシャルをまとめる</span></label>
         <label class="chk"><input type="checkbox" id="excSan"><span>SANcを成長対象に含めない</span></label>
         <label class="chk"><input type="checkbox" id="splitCritShoki"><span>クリティカルと初期値成功を分ける</span></label>
+        <label class="chk"><input type="checkbox" id="dedupShoki"><span>初期値成功の重複なし</span></label>
       </div>
       <div class="cat-grid" id="catGrid"></div>
     </div>
@@ -225,15 +226,10 @@
           <thead>
             <tr>
               <th class="corner"></th><th class="corner"></th>
-              <th class="grouphead" colspan="5">抽出したダイス結果</th>
+              <th class="grouphead" id="matrixGroupHead" colspan="5">抽出したダイス結果</th>
             </tr>
-            <tr>
+            <tr id="matrixColHead">
               <th class="corner"></th><th class="corner"></th>
-              <th class="colhead ch-crit">クリティカル</th>
-              <th class="colhead ch-spec">スペシャル</th>
-              <th class="colhead ch-succ">成功</th>
-              <th class="colhead ch-fumb">ファンブル</th>
-              <th class="colhead ch-shoki">初期値成功</th>
             </tr>
           </thead>
           <tbody id="matrixBody"></tbody>
@@ -565,7 +561,12 @@ function renderExtraction(){
     grid.appendChild(catCard('success','成功',g.success,excS));
   }
   grid.appendChild(catCard('fumble','ファンブル',g.fumble,false));
-  grid.appendChild(catCard('shoki','初期値成功',g.shoki,false));
+  let shokiList=g.shoki;
+  if(document.getElementById('dedupShoki').checked){
+    const seen=new Set();
+    shokiList=g.shoki.filter(r=>{ if(seen.has(r.skill))return false; seen.add(r.skill); return true; });
+  }
+  grid.appendChild(catCard('shoki','初期値成功',shokiList,false));
 }
 function catCard(cls,title,rolls,dim){
   const div=document.createElement('div'); div.className='cat '+cls+(dim?' dim':'');
@@ -610,13 +611,26 @@ function afterSubChange(){
    ============================================================ */
 function renderMatrix(){
   const judgeOn=document.getElementById('shokiJudge').checked;
+  const merge=document.getElementById('mergeSuSp').checked;
+  // 表示する抽出列（merge時はスペシャルを成功にまとめる）
+  const baseCols = merge ? ['crit','success','fumble'] : ['crit','special','success','fumble'];
+  const headCols = baseCols.concat(['shoki']);
+  const HEADLBL = {crit:'クリティカル',special:'スペシャル',success:'成功',fumble:'ファンブル',shoki:'初期値成功'};
+  const HEADCLS = {crit:'ch-crit',special:'ch-spec',success:'ch-succ',fumble:'ch-fumb',shoki:'ch-shoki'};
+
+  // ヘッダー
+  document.getElementById('matrixGroupHead').setAttribute('colspan', headCols.length);
+  const ch=document.getElementById('matrixColHead');
+  ch.innerHTML='<th class="corner"></th><th class="corner"></th>'+headCols.map(c=>'<th class="colhead '+HEADCLS[c]+'" data-col="'+c+'">'+HEADLBL[c]+'</th>').join('');
+
+  // ボディ
   const body=document.getElementById('matrixBody'); body.innerHTML='';
   ROWS.forEach((row,ri)=>{
     const tr=document.createElement('tr');
     let cells='';
     if(ri===0) cells+='<th class="sidelabel" rowspan="'+ROWS.length+'">成長判定時の結果区分</th>';
     cells+='<td class="rowhead '+ROWCLS[row]+'">'+LABEL[row]+'</td>';
-    ['crit','special','success','fumble'].forEach(col=>{
+    baseCols.forEach(col=>{
       cells+='<td><input class="amt" type="text" data-r="'+row+'" data-c="'+col+'" value="'+esc(STATE.matrix[row][col])+'"></td>';
     });
     if(judgeOn){
@@ -639,8 +653,8 @@ function updateMatrixGrayout(){
   const excSp=document.getElementById('excSpecial').checked;
   document.querySelectorAll('#matrixBody input.amt[data-c="success"]').forEach(el=>{ el.closest('td').classList.toggle('grayed',excS); el.disabled=excS; });
   document.querySelectorAll('#matrixBody input.amt[data-c="special"]').forEach(el=>{ el.closest('td').classList.toggle('grayed',excSp); el.disabled=excSp; });
-  document.querySelectorAll('#ruleMatrix .colhead.ch-succ').forEach(el=>el.classList.toggle('grayed',excS));
-  document.querySelectorAll('#ruleMatrix .colhead.ch-spec').forEach(el=>el.classList.toggle('grayed',excSp));
+  document.querySelectorAll('#ruleMatrix .colhead[data-col="success"]').forEach(el=>el.classList.toggle('grayed',excS));
+  document.querySelectorAll('#ruleMatrix .colhead[data-col="special"]').forEach(el=>el.classList.toggle('grayed',excSp));
 }
 function matrixValid(){
   const okCells=ROWS.every(r=>COLS.every(c=>exprValid(STATE.matrix[r][c])));
@@ -850,11 +864,17 @@ document.getElementById('jsonBtn').addEventListener('click',()=>jsonInput.click(
 jsonInput.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{document.getElementById('jsonPaste').value=ev.target.result;applyCharacterJson(ev.target.result);};rd.readAsText(f,'UTF-8');});
 document.getElementById('jsonApply').addEventListener('click',()=>{const t=document.getElementById('jsonPaste').value.trim();if(!t){const s=document.getElementById('jsonStatus');s.className='json-status err';s.textContent='JSONが空です。';return;}applyCharacterJson(t);});
 
-['excSuccess','excSpecial','mergeSuSp','excSan'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+['excSuccess','excSpecial','excSan'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
   updateMatrixGrayout();
   renderExtraction(); renderSubPanel(); updateJudgeHint();
   if(STATE.resultRows) judge();
 }));
+document.getElementById('mergeSuSp').addEventListener('change',()=>{
+  renderMatrix();
+  renderExtraction(); renderSubPanel(); updateJudgeHint();
+  if(STATE.resultRows) judge();
+});
+document.getElementById('dedupShoki').addEventListener('change',renderExtraction);
 document.getElementById('splitCritShoki').addEventListener('change',()=>{
   rebuildPool(); renderExtraction(); renderSubPanel(); updateJudgeHint();
   if(STATE.resultRows) judge();
