@@ -100,6 +100,9 @@
   table.matrix th.corner{background:transparent;border:none}
   table.matrix th.sidelabel{writing-mode:vertical-rl;text-orientation:upright;font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--gold);background:rgba(198,160,82,.06);border-right:1px solid var(--gold-dim);padding:6px 3px}
   table.matrix input.amt{width:84px;text-align:center;font-family:var(--mono);font-size:13px;padding:7px 4px}
+  table.matrix td.grayed{background:repeating-linear-gradient(45deg,#1a1923,#1a1923 6px,#16151d 6px,#16151d 12px);opacity:.5}
+  table.matrix td.grayed input.amt{color:var(--muted-2);background:transparent;cursor:not-allowed;text-decoration:line-through}
+  table.matrix .colhead.grayed{opacity:.38;text-decoration:line-through}
   .rh-crit{color:var(--crit)}.rh-spec{color:var(--special)}.rh-succ{color:var(--success)}.rh-fail{color:var(--fail)}.rh-fumb{color:var(--fumble)}.rh-shoki{color:var(--shoki)}
   .ch-crit{color:var(--crit)}.ch-spec{color:var(--special)}.ch-succ{color:var(--success)}.ch-fumb{color:var(--fumble)}
   table.matrix tr.row-shoki td{background:linear-gradient(180deg,rgba(159,207,127,.06),transparent)}
@@ -327,10 +330,16 @@ const JCLS   = {crit:'j-crit',special:'j-spec',success:'j-succ',fail:'j-fail',fu
 const TAGCLS = {crit:'t-crit',special:'t-spec',success:'t-succ',fumble:'t-fumb',shoki:'t-shoki'};
 
 /* デフォルト：全セル 1d10、確定成長も 1d10 */
-const DEFAULT_AMT = '1d10';
 const DEFAULT_SHOKI_FIXED = '1d10';
-// マトリクス初期化（全セル 1d10）
-ROWS.forEach(r=>{ STATE.matrix[r]={}; COLS.forEach(c=>{ STATE.matrix[r][c]=DEFAULT_AMT; }); });
+// マトリクス初期設定（行: 成長判定の出目区分 / 列: 抽出したダイス結果）
+const DEFAULT_MATRIX = {
+  crit:    {crit:'1d10',special:'1d10',success:'1d10',fumble:'1d5',shoki:'1d10'},
+  special: {crit:'0',   special:'0',   success:'0',   fumble:'0',  shoki:'0'},
+  success: {crit:'0',   special:'0',   success:'0',   fumble:'0',  shoki:'0'},
+  fail:    {crit:'1d10',special:'1d10',success:'1d10',fumble:'1d5',shoki:'1d10'},
+  fumble:  {crit:'1d10',special:'1d10',success:'1d10',fumble:'1d5',shoki:'1d10'},
+};
+ROWS.forEach(r=>{ STATE.matrix[r]={}; COLS.forEach(c=>{ STATE.matrix[r][c]=DEFAULT_MATRIX[r][c]; }); });
 STATE.shokiFixed = DEFAULT_SHOKI_FIXED;
 
 /* SAN系判定の名称 */
@@ -622,6 +631,16 @@ function renderMatrix(){
   });
   const fx=document.getElementById('m-shoki-fixed');
   if(fx) fx.addEventListener('input',()=>{ STATE.shokiFixed=fx.value; fx.style.borderColor=exprValid(fx.value)?'':'var(--fumble)'; });
+  updateMatrixGrayout();
+}
+/* 成功/スペシャルを含めない時、抽出列の該当セルをグレーアウト */
+function updateMatrixGrayout(){
+  const excS=document.getElementById('excSuccess').checked;
+  const excSp=document.getElementById('excSpecial').checked;
+  document.querySelectorAll('#matrixBody input.amt[data-c="success"]').forEach(el=>{ el.closest('td').classList.toggle('grayed',excS); el.disabled=excS; });
+  document.querySelectorAll('#matrixBody input.amt[data-c="special"]').forEach(el=>{ el.closest('td').classList.toggle('grayed',excSp); el.disabled=excSp; });
+  document.querySelectorAll('#ruleMatrix .colhead.ch-succ').forEach(el=>el.classList.toggle('grayed',excS));
+  document.querySelectorAll('#ruleMatrix .colhead.ch-spec').forEach(el=>el.classList.toggle('grayed',excSp));
 }
 function matrixValid(){
   const okCells=ROWS.every(r=>COLS.every(c=>exprValid(STATE.matrix[r][c])));
@@ -832,6 +851,7 @@ jsonInput.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;c
 document.getElementById('jsonApply').addEventListener('click',()=>{const t=document.getElementById('jsonPaste').value.trim();if(!t){const s=document.getElementById('jsonStatus');s.className='json-status err';s.textContent='JSONが空です。';return;}applyCharacterJson(t);});
 
 ['excSuccess','excSpecial','mergeSuSp','excSan'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+  updateMatrixGrayout();
   renderExtraction(); renderSubPanel(); updateJudgeHint();
   if(STATE.resultRows) judge();
 }));
